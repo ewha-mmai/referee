@@ -1,0 +1,167 @@
+model:
+  params:
+    afeat_extractor:
+      is_trainable: False
+      target: model.modules.feat_extractors.audio.ast.AST
+      params:
+        ckpt_path: null
+        extract_features: True
+        max_spec_t: 66
+        factorize_freq_time: True
+        agg_freq_module: TransformerEncoderLayer
+        agg_time_module: torch.nn.Identity
+        add_global_repr: False
+
+    vfeat_extractor:
+      is_trainable: False
+      target: model.modules.feat_extractors.visual.motionformer.MotionFormer
+      params:
+        ckpt_path: null
+        extract_features: True
+        factorize_space_time: True
+        agg_space_module: TransformerEncoderLayer
+        agg_time_module: torch.nn.Identity
+        add_global_repr: False
+
+    aproj:
+      target: torch.nn.Linear
+      params:
+        in_features: 768
+        out_features: 768
+
+    vproj:
+      target: torch.nn.Linear
+      params:
+        in_features: 768
+        out_features: 768
+
+    transformer:
+      target: model.sync_model.GlobalTransformer
+      params:
+        n_layer: 3
+        n_head: 8
+        n_embd: 768
+        tok_pdrop: 0.0
+        embd_pdrop: 0.1
+        resid_pdrop: 0.1
+        attn_pdrop: 0.1
+        pos_emb_cfg:
+          target: model.modules.transformer.RandInitPositionalEncoding
+          params:
+            block_shape: [198] 
+            n_embd: 768
+
+    identity_bottleneck:
+      params:
+        n_layer: 2
+        n_id : 6
+
+    cross_attn_block:
+      params:
+        n_layer: 2
+
+
+training:
+  lr_initial: 1e-5
+  num_epochs: 50          # Total number of training epochs
+  warmup_t: 500           # Warmup duration
+  t_in_epochs: False      # Set to False if using step-based schedule, True if using epoch-based schedule
+
+  lr_scheduler:
+    name: 'cosine'
+    lr_min: 1e-6          # Minimum learning rate
+    warmup_lr_init: 1e-7  # Initial learning rate during warm-up
+    warmup_prefix: True   # If True, start scheduler after warm-up
+
+
+data:
+  step_size_seg: 0.5
+  size_before_crop: 256
+  input_size: 224
+  segment_size_vframes: 16
+  vfps: 25
+  afps: 16000
+  n_segments: 8
+  batch_size: 2
+
+  sometimes_upscale_p: 0.0 
+  is_spatial_crop_random: False  
+  is_temporal_crop_random: False  
+
+  train_transform: ${transform_sequence_train}
+  val_transform: ${transform_sequence_test}
+
+transform_sequence_train:
+  - target: dataset.transforms.RGBSpatialCropSometimesUpscale
+    params:
+      sometimes_p: ${data.sometimes_upscale_p}
+      smaller_input_size: 192
+      target_input_size: ${data.input_size}
+      is_random: ${data.is_spatial_crop_random}
+  - target: dataset.transforms.GenerateMultipleSegments
+    params:
+      segment_size_vframes: ${data.segment_size_vframes}
+      n_segments: ${data.n_segments}
+      is_start_random: ${data.is_temporal_crop_random}
+      step_size_seg: ${data.step_size_seg}
+  - target: dataset.transforms.RGBToHalfToZeroOne
+  - target: dataset.transforms.RGBNormalize
+    params:
+      mean: [0.5, 0.5, 0.5]
+      std: [0.5, 0.5, 0.5]
+  - target: dataset.transforms.AudioMelSpectrogram
+    params:
+      sample_rate: ${data.afps}
+      win_length: 400
+      hop_length: 160
+      n_fft: 1024
+      n_mels: 128
+  - target: dataset.transforms.AudioLog
+  - target: dataset.transforms.PadOrTruncate
+    params:
+      max_spec_t: ${model.params.afeat_extractor.params.max_spec_t}
+  - target: dataset.transforms.AudioNormalizeAST
+    params:
+      mean: -4.2677393
+      std: 4.5689974
+  - target: dataset.transforms.PermuteStreams
+    params:
+      einops_order_audio: "S F T -> S 1 F T"
+      einops_order_rgb: "S T C H W -> S T C H W"
+
+transform_sequence_test:
+  - target: dataset.transforms.RGBSpatialCrop
+    params:
+      input_size: ${data.input_size}
+      is_random: False
+  - target: dataset.transforms.GenerateMultipleSegments
+    params:
+      segment_size_vframes: ${data.segment_size_vframes}
+      n_segments: ${data.n_segments}
+      is_start_random: False
+      step_size_seg: ${data.step_size_seg}
+  - target: dataset.transforms.RGBToHalfToZeroOne
+  - target: dataset.transforms.RGBNormalize
+    params:
+      mean: [0.5, 0.5, 0.5]
+      std: [0.5, 0.5, 0.5]
+  - target: dataset.transforms.AudioMelSpectrogram
+    params:
+      sample_rate: ${data.afps}
+      win_length: 400
+      hop_length: 160
+      n_fft: 1024
+      n_mels: 128
+  - target: dataset.transforms.AudioLog
+  - target: dataset.transforms.PadOrTruncate
+    params:
+      max_spec_t: ${model.params.afeat_extractor.params.max_spec_t}
+  - target: dataset.transforms.AudioNormalizeAST
+    params:
+      mean: -4.2677393
+      std: 4.5689974
+  - target: dataset.transforms.PermuteStreams
+    params:
+      einops_order_audio: "S F T -> S 1 F T"
+      einops_order_rgb: "S T C H W -> S T C H W"
+
