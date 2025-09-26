@@ -10,7 +10,7 @@ python -m src.train \
 --num_workers 16 \
 --exp_dir ${EXP_DIR} \
 --config configs/pair_sync.yaml \
---model_path model/pretrained/23-12-23T18-33-57.pt \
+--model_path model/pretrained/pretrained.pth \
 --train_json data/train_set.json \
 --val_json data/val_set.json \
 --start_epoch 0 \

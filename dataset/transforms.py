@@ -199,20 +199,35 @@ class GenerateMultipleSegments(torch.nn.Module):
             v_start_i = max_v_start_i // 2
         a_start_i = sec2frames(frames2sec(v_start_i, v_fps), a_fps)  # vid frames -> seconds -> aud frames
 
+        max_a_start_i = max(a_len_frames - aframes_seg_seq_len, 0)
+        a_start_i = min(a_start_i, max_a_start_i)
+
         # make segments starts
         v_start_seg_i = torch.tensor([v_start_i + i * step_size_vframes for i in range(n_seg)]).int()
         a_start_seg_i = torch.tensor([a_start_i + i * step_size_aframes for i in range(n_seg)]).int()
 
-        # apply jitter to audio
+        # # apply jitter to audio (original)
+        # if self.audio_jitter_sec > 0:
+        #     jitter_aframes = sec2frames(self.audio_jitter_sec, a_fps)
+        #     # making sure after applying jitter, the audio is still within the audio boundaries
+        #     jitter_aframes = min(jitter_aframes, a_start_i, a_len_frames-a_start_i-aframes_seg_seq_len)
+        #     a_start_seg_i += random.randint(-jitter_aframes, jitter_aframes)  # applying jitter to segments
+
+        # Edit
         if self.audio_jitter_sec > 0:
             jitter_aframes = sec2frames(self.audio_jitter_sec, a_fps)
-            # making sure after applying jitter, the audio is still within the audio boundaries
-            jitter_aframes = min(jitter_aframes, a_start_i, a_len_frames-a_start_i-aframes_seg_seq_len)
-            a_start_seg_i += random.randint(-jitter_aframes, jitter_aframes)  # applying jitter to segments
+            new_a_start_seg_i = []
+
+            for start in a_start_seg_i:
+                max_jitter = min(jitter_aframes, start.item(), a_len_frames - start.item() - seg_size_aframes)
+                jitter = random.randint(-max_jitter, max_jitter)
+                new_a_start_seg_i.append(start + jitter)
+
+            a_start_seg_i = torch.tensor(new_a_start_seg_i, dtype=torch.int32)
 
         # make segment ends
         v_ends_seg_i = v_start_seg_i + seg_size_vframes
-        a_ends_seg_i = a_start_seg_i + seg_size_aframes  # using the adjusted a_start_seg_i (with jitter
+        a_ends_seg_i = a_start_seg_i + seg_size_aframes  # using the adjusted a_start_seg_i (with jitter)
 
         # make ranges
         v_ranges = torch.stack([v_start_seg_i, v_ends_seg_i], dim=1)
