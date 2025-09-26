@@ -43,4 +43,3 @@ env/
 .DS_Store
 
 exp/
-model/pretrained/
