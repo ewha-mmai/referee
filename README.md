@@ -25,7 +25,20 @@ pip install -r requirements.txt
 ```
 
 ### Dataset
-For training and evaluation, the dataset should be prepared following the detailed format explained in [`pretrained/README.md`](./pretrained/README.md).
+For training and evaluation, the dataset should be prepared following the specified format.  
+An example dataset structure is provided in the [`data/`](./data). 
+
+### Pretrained Checkpoints
+
+This project requires pretrained checkpoints to run training, evaluation, or fine-tuning.
+
+- **Training from Scratch**  
+  To train the model from scratch, download the Synchformer checkpoint trained on **LRS3** from the [link](https://github.com/v-iashin/Synchformer) and place it in the `pretrained/` directory.
+
+- **Evaluation or Fine-tuning Referee**  
+  To evaluate or fine-tune **Referee**, download the provided checkpoint from the link below and put it into the `pretrained/` directory:
+(link)
+
 
 ## Train
 To train Referee, you can use the provided `train.sh`. Some training-specific settings, such as the number of epochs, starting epoch, and training dataset, are set directly in `train.sh`.
