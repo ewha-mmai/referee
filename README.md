@@ -15,6 +15,7 @@ Extensive experiments on FakeAVCeleb, FaceForensics++, and KoDF demonstrate that
 Experimental results highlight the importance of cross-modal identity verification for future deepfake detection. 
 
 ## Requirements
+### Environment
 To train or evaluate Referee, you must first set up the environment:
 
 ```bash
@@ -22,6 +23,9 @@ conda create -n referee python=3.8.16
 conda activate referee
 pip install -r requirements.txt
 ```
+
+### Dataset
+For training and evaluation, the dataset should be prepared following the detailed format explained in [`pretrained/README.md`](./pretrained/README.md).
 
 ## Train
 To train Referee, you can use the provided `train.sh`. Some training-specific settings, such as the number of epochs, starting epoch, and training dataset, are set directly in `train.sh`.
