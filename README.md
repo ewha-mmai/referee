@@ -56,8 +56,7 @@ This project requires pretrained checkpoints to run training, evaluation, or fin
   Download the Synchformer checkpoint trained on **LRS3** from the [link](https://github.com/v-iashin/Synchformer) and place it in the `model/pretrained/` directory.
 
 - **Evaluation or Fine-tuning Referee**  
-  To evaluate or fine-tune ***Referee***, download the provided checkpoint from the link below and put it into the `model/pretrained/` directory:
-(link)
+  To evaluate or fine-tune ***Referee***, download the provided checkpoint from the [link](https://huggingface.co/eunsanglee/Referee/tree/main)  and put it into the `model/pretrained/` directory.
 
 <!-- - **Training with Pretrained Synchformer**
   To train the model starting from a Synchformer backbone, download the checkpoint trained on LRS3 from the [link](https://github.com/v-iashin/Synchformer) and place it in the `model/pretrained/` directory. -->
