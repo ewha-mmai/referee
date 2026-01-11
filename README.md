@@ -1,7 +1,7 @@
 # Referee: Reference-aware Audiovisual Deepfake Detection
-Hyemin Boo<sup>*</sup>, Eunsang Lee<sup>*</sup>, Jiyoung Lee<sup>†</sup>
+Hyemin Boo<sup>\*</sup>, Eunsang Lee<sup>\*</sup>, Jiyoung Lee<sup>†</sup>
 
-<sup>*</sup>Equal contribution
+<sup>\*</sup>Equal contribution
 <sup>†</sup>Corresponding author
 
 <div>
