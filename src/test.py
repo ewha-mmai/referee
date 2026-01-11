@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import random
 from torch.cuda.amp import autocast
 from sklearn.metrics import accuracy_score, classification_report, average_precision_score, roc_auc_score
 from torchvision import transforms as T
@@ -27,6 +28,10 @@ def test(model, test_loader, args, cfg):
     AUDIO_SR = 16000
     STRIDE_SECONDS = CLIP_SECONDS * 0.95
 
+    REF_CLIP_SECONDS = 3.0
+    ref_video_clip_size = int(REF_CLIP_SECONDS * FPS)
+    ref_audio_clip_size = int(REF_CLIP_SECONDS * AUDIO_SR)
+
     video_window_size = int(CLIP_SECONDS * FPS)
     video_stride = int(STRIDE_SECONDS * FPS)
     audio_window_size = int(CLIP_SECONDS * AUDIO_SR)
@@ -42,7 +47,7 @@ def test(model, test_loader, args, cfg):
 
     # Lists for RF task metrics
     A_loss_rf, all_rf_preds, all_rf_labels, all_rf_probs = [], [], [], []
-    
+
     # Lists for ID task metrics
     A_loss_id, all_id_preds, all_id_labels, all_id_probs = [], [], [], []
 
@@ -56,7 +61,10 @@ def test(model, test_loader, args, cfg):
             labels_rf = batch['fake_label'].to(device, non_blocking=True)
             labels_id = batch['id_label'].to(device, non_blocking=True)
 
-            # Padding for short sequences
+            B, T_v_ref, C, H, W = ref_v_full.shape
+            T_a_ref = ref_a_full.shape[1]
+            
+            # Padding for short target sequences
             if target_v_full.shape[1] < video_window_size:
                 pad_size = video_window_size - target_v_full.shape[1]
                 target_v_full = target_v_full.permute(0, 2, 3, 4, 1)
@@ -66,63 +74,67 @@ def test(model, test_loader, args, cfg):
                 pad_size = audio_window_size - target_a_full.shape[1]
                 target_a_full = F.pad(target_a_full, (0, pad_size), "constant", 0)
         
-            if ref_v_full.shape[1] < video_window_size:
-                pad_size = video_window_size - ref_v_full.shape[1]
-                ref_v_full = ref_v_full.permute(0, 2, 3, 4, 1)
-                ref_v_full = F.pad(ref_v_full, (0, pad_size), "constant", 0)
-                ref_v_full = ref_v_full.permute(0, 4, 1, 2, 3)
-            if ref_a_full.shape[1] < audio_window_size:
-                pad_size = audio_window_size - ref_a_full.shape[1]
-                ref_a_full = F.pad(ref_a_full, (0, pad_size), "constant", 0)
-
-            # Window unfolding
+            # Window unfolding (for target)
             target_v_windows = target_v_full.unfold(1, video_window_size, video_stride)
-            ref_v_windows = ref_v_full.unfold(1, video_window_size, video_stride)
             target_a_windows = target_a_full.unfold(1, audio_window_size, audio_stride)
-            ref_a_windows = ref_a_full.unfold(1, audio_window_size, audio_stride)
 
-            # Convert windows into batch form
+            # Convert windows into batch form (for target)
             target_v_batch = target_v_windows.permute(0, 1, 5, 2, 3, 4).squeeze(0)
-            ref_v_batch = ref_v_windows.permute(0, 1, 5, 2, 3, 4).squeeze(0)
             target_a_batch = target_a_windows.squeeze(0)
-            ref_a_batch = ref_a_windows.squeeze(0)
 
-            num_win_tv = target_v_batch.shape[0]
-            num_win_ta = target_a_batch.shape[0]
-            num_win_rv = ref_v_batch.shape[0]
-            num_win_ra = ref_a_batch.shape[0]
-            
-            # Final number of windows based on target
-            final_num_windows = min(num_win_tv, num_win_ta)
-            ref_num_windows = min(num_win_rv, num_win_ra)
-
-            # Pad reference windows if shorter
-            if ref_num_windows < final_num_windows:
-                padding_needed = final_num_windows - ref_num_windows
-                
-                last_ref_v = ref_v_batch[-1].unsqueeze(0)
-                ref_v_padding = last_ref_v.repeat(padding_needed, 1, 1, 1, 1)
-                ref_v_batch = torch.cat([ref_v_batch, ref_v_padding], dim=0)
-                
-                last_ref_a = ref_a_batch[-1].unsqueeze(0)
-                ref_a_padding = last_ref_a.repeat(padding_needed, 1)
-                ref_a_batch = torch.cat([ref_a_batch, ref_a_padding], dim=0)
-            
-            # Truncate to match length
+            final_num_windows = min(target_v_batch.shape[0], target_a_batch.shape[0])
             target_v_batch = target_v_batch[:final_num_windows]
             target_a_batch = target_a_batch[:final_num_windows]
-            ref_v_batch = ref_v_batch[:final_num_windows]
-            ref_a_batch = ref_a_batch[:final_num_windows]
+            
+
+            # Video Reference Clipping/Padding
+            if T_v_ref > ref_video_clip_size:
+                # Select a random start frame for the 3-seconds clip
+                start_v_idx = random.randint(0, T_v_ref - ref_video_clip_size)
+                ref_v_3sec = ref_v_full[:, start_v_idx : start_v_idx + ref_video_clip_size, :, :, :]
+            else:
+                # If shorter than 3 seconds, pad/duplicate last frame
+                ref_v_3sec = ref_v_full
+                if T_v_ref < ref_video_clip_size:
+                    pad_size = ref_video_clip_size - T_v_ref
+                    # Move time dimension to end for F.pad, then move back
+                    ref_v_3sec = ref_v_3sec.permute(0, 2, 3, 4, 1)
+                    ref_v_3sec = F.pad(ref_v_3sec, (0, pad_size), "replicate")
+                    ref_v_3sec = ref_v_3sec.permute(0, 4, 1, 2, 3)
+
+            # Remove batch dimension for concatenation later (shape: (T_v_3sec, C, H, W))
+            ref_v_3sec_single = ref_v_3sec.squeeze(0)
+
+            # Audio Reference Clipping/Padding
+            if T_a_ref > ref_audio_clip_size:
+                # Select a random start sample for the 3-second clip
+                start_a_idx = random.randint(0, T_a_ref - ref_audio_clip_size)
+                ref_a_3sec = ref_a_full[:, start_a_idx : start_a_idx + ref_audio_clip_size]
+            else:
+                # If shorter than 3 seconds, pad/duplicate last sample
+                ref_a_3sec = ref_a_full
+                if T_a_ref < ref_audio_clip_size:
+                    pad_size = ref_audio_clip_size - T_a_ref
+                    ref_a_3sec = F.pad(ref_a_3sec, (0, pad_size), "replicate")
+
+            # Remove batch dimension (shape: (T_a_3sec,))
+            ref_a_3sec_single = ref_a_3sec.squeeze(0)
+
+            # duplicate the single 3-sec reference clip to match the number of target windows
+            ref_v_batch = ref_v_3sec_single.unsqueeze(0).repeat(final_num_windows, 1, 1, 1, 1)
+            ref_a_batch = ref_a_3sec_single.unsqueeze(0).repeat(final_num_windows, 1)
 
             # Apply transforms
             transformed_target_v, transformed_target_a = [], []
             transformed_ref_v, transformed_ref_a = [], []
             for k in range(final_num_windows):
+                # Target
                 sample = {'video': target_v_batch[k], 'audio': target_a_batch[k], 'meta': {'video': {}, 'audio': {}}}
                 transformed = single_clip_transformer(sample)
                 transformed_target_v.append(transformed['video'])
                 transformed_target_a.append(transformed['audio'])
 
+                # Reference
                 sample = {'video': ref_v_batch[k], 'audio': ref_a_batch[k], 'meta': {'video': {}, 'audio': {}}}
                 transformed = single_clip_transformer(sample)
                 transformed_ref_v.append(transformed['video'])

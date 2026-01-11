@@ -31,7 +31,12 @@ def _load_backbone_weights(self, ckpt_path: str):
 def _load_full_model(self, ckpt_path: str):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ckpt = torch.load(ckpt_path, map_location=device)
-    raw_model = ckpt['model_state_dict']
+
+    # Handle both wrapped and direct state_dict formats
+    if 'model_state_dict' in ckpt:
+        raw_model = ckpt['model_state_dict']
+    else:
+        raw_model = ckpt
 
     new_state_dict = {}
     for k, v in raw_model.items():
