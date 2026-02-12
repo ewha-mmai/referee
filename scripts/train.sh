@@ -1,11 +1,8 @@
 #!/bin/bash
 
 export CUDA_VISIBLE_DEVICES=3
-# 경로 설정
 EXP_DIR=./exp
 
-
-# 실행
 python -m src.train \
 --num_workers 16 \
 --exp_dir ${EXP_DIR} \
