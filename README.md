@@ -1,4 +1,4 @@
-# Referee: Reference-aware Audiovisual Deepfake Detection (INTERSPEECH 2026)
+# Referee: Reference-aware Audiovisual Deepfake Detection (Interspeech 2026)
 Hyemin Boo<sup>\*</sup>, Eunsang Lee<sup>\*</sup>, Jiyoung Lee<sup>†</sup>
 
 <sup>\*</sup>Equal contribution
@@ -7,7 +7,6 @@ Hyemin Boo<sup>\*</sup>, Eunsang Lee<sup>\*</sup>, Jiyoung Lee<sup>†</sup>
 
 <div>
 	<a href="https://arxiv.org/abs/2510.27475"><img src="https://img.shields.io/badge/arXiv-2510.27475-b31b1b.svg" height=22.5></a>
-	<img src="https://img.shields.io/badge/Interspeech%202026-Accepted-4c1.svg" height="22.5"/>
 </div>
 
 
